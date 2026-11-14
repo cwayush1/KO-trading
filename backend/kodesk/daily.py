@@ -47,6 +47,19 @@ def daily_state(d: pd.DataFrame) -> pd.DataFrame:
     F["last_hour_ret"] = np.log(d["lh_close"] / d["lh_open"]) / vol20
     F["first_hour_ret"] = np.log(d["fh_close"] / d["fh_open"]) / vol20
     F["pos_in_20d_range"] = (c - l.rolling(20).min()) / (h.rolling(20).max() - l.rolling(20).min())
+    # --- Additional context features ---
+    # Gap direction and magnitude (useful for slot-level prediction)
+    F["gap_1d"] = np.log(o / c.shift(1)) / vol20
+    # Whether the day closed in its upper or lower half (momentum vs mean-reversion signal)
+    F["close_vs_open_rank"] = intraday.rolling(60, min_periods=20).rank(pct=True)
+    # Short-term mean reversion: how extended vs 5-day range
+    F["ret_1d_rank"] = ret.rolling(60, min_periods=20).rank(pct=True)
+    # Volume trend: today vs prior week average
+    F["volume_trend"] = np.log(v / v.rolling(5, min_periods=3).mean().shift(1))
+    # Overnight gap streak (consecutive gap ups or downs)
+    gap = np.log(o / c.shift(1))
+    gap_up = (gap > 0).astype(float)
+    F["gap_up_streak"] = gap_up.groupby((gap_up == 0).cumsum()).cumsum()
     return pd.DataFrame(F).replace([np.inf, -np.inf], np.nan)
 
 

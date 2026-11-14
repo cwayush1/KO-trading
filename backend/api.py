@@ -37,7 +37,7 @@ def forecaster() -> Forecaster:
     return _forecaster
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     f = forecaster()
     return {"status": "ok", "model": f.bundle["model_label"], "trained_through": f.trained_through.strftime("%Y-%m-%d"),

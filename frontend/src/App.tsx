@@ -179,10 +179,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="top">
-        {/* KO Logo + Identity */}
+        {/* Coca-Cola Logo + Identity */}
         <div className="ident">
           <div className="ko-logo">
-            <span className="ko-badge">KO</span>
+            <img src="/coca-cola-logo.svg" alt="Coca-Cola" className="ko-img" />
             <div>
               <h1>Coca-Cola Co</h1>
               <p>NYSE · 5-minute candles</p>

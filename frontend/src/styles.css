@@ -34,15 +34,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--model); out
 .ident h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
 .ident p { color: var(--muted); font-size: 13px; margin-top: 4px; }
 
-/* KO Logo badge */
+/* KO Logo */
 .ko-logo { display: flex; align-items: center; gap: 14px; }
-.ko-badge {
-  width: 52px; height: 52px; border-radius: 14px;
-  background: linear-gradient(135deg, #e61a2f 0%, #c0001a 100%);
-  color: #fff; font-size: 20px; font-weight: 800; letter-spacing: -0.03em;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 8px rgba(198,0,26,0.35);
+.ko-img {
+  height: 38px;
+  width: auto;
+  max-width: 130px;
+  object-fit: contain;
   flex-shrink: 0;
+  display: block;
 }
 .ko-logo h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin: 0; }
 .ko-logo p { color: var(--muted); font-size: 12px; margin-top: 3px; }

@@ -37,6 +37,11 @@ def forecaster() -> Forecaster:
     return _forecaster
 
 
+@app.api_route("/", methods=["GET", "HEAD"])
+def root():
+    return {"message": "KO Trading API is live"}
+
+
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     f = forecaster()

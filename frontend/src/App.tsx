@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { apiUrl, fetchCone, fetchConeScores, fetchDayPlan, fetchPlanScores, fetchPrediction, fetchTouch, loadDataset, requestUpdate, sliceBars, type Dataset } from './lib/data'
+import { apiUrl, fetchCone, fetchConeScores, fetchDayPlan, fetchPlanScores, fetchPrediction, loadDataset, requestUpdate, sliceBars, type Dataset } from './lib/data'
 import { computeIndicators } from './lib/indicators'
 import { analyze } from './lib/analysis'
 import { clockIn, dayLabel, defaultZone, hhmm, inZone, isoDate, nyNow, parseEt, saveZone, type Zone } from './lib/time'
-import type { Cone, ConeScores, DayPlan, PlanScores, Prediction, RangeKey, Toggles, Touch } from './lib/types'
-import PriceChart, { COLORS, type Ladder } from './components/PriceChart'
+import type { Cone, ConeScores, DayPlan, PlanScores, Prediction, RangeKey, Toggles } from './lib/types'
+import PriceChart from './components/PriceChart'
 import SessionBar from './components/SessionBar'
 import DayPlanPanel from './components/DayPlan'
 import RangeConeStrip from './components/RangeCone'
-import TouchLadderStrip, { touchOdds } from './components/TouchLadder'
 import PredictionPanel from './components/PredictionPanel'
 
 const RANGES: RangeKey[] = ['1D', '5D', '1M', '3M']
@@ -28,11 +27,6 @@ export default function App() {
   const [coneScores, setConeScores] = useState<ConeScores | null>(null)
   const [showCone, setShowCone] = useState(true)
   const [reveal, setReveal] = useState(false)
-  const [touch, setTouch] = useState<Touch | null>(null)
-  const [pick, setPick] = useState<'cone' | 'touch' | null>(null)   // null: ladder while a window fits, else cone
-  const [winMin, setWinMin] = useState(60)
-  const [target, setTarget] = useState('')
-  const [stop, setStop] = useState('')
   const [plan, setPlan] = useState<DayPlan | null>(null)
   const [nextPlan, setNextPlan] = useState<DayPlan | null>(null)
   const [scores, setScores] = useState<PlanScores | null>(null)
@@ -110,9 +104,6 @@ export default function App() {
       fetchCone(`${isoDate(asOfT)}T${hhmm(asOfT)}`, ctl.signal)
         .then(setCone)
         .catch((e: Error) => { if (e.name !== 'AbortError') setCone(null) })
-      fetchTouch(`${isoDate(asOfT)}T${hhmm(asOfT)}`, ctl.signal)
-        .then(setTouch)
-        .catch((e: Error) => { if (e.name !== 'AbortError') setTouch(null) })
       fetchConeScores(`${isoDate(asOfT)}T${hhmm(asOfT)}`, ctl.signal)
         .then(setConeScores)
         .catch((e: Error) => { if (e.name !== 'AbortError') setConeScores(null) })
@@ -138,23 +129,6 @@ export default function App() {
     for (let k = asOf + 1; k < data.bars.t.length && data.bars.t[k] <= last; k++) after.push({ t: data.bars.t[k], c: data.bars.c[k] })
     return { points, after }
   }, [data, cone, asOf, asOfT])
-
-  // Touch ladder: the chosen window, or the longest one that still fits before the bell.
-  const touchNow = touch && touch.asof === `${isoDate(asOfT)}T${hhmm(asOfT)}` ? touch : null
-  const fitting = touchNow ? touchNow.windows.filter((w) => w.fits) : []
-  const win = fitting.find((w) => w.minutes === winMin) ?? fitting[fitting.length - 1] ?? null
-  const mode: 'cone' | 'touch' = pick ?? (win ? 'touch' : 'cone')
-  const ladder = useMemo<Ladder | null>(() => {
-    if (mode !== 'touch' || !touchNow || !win) return null
-    const marks: Ladder['marks'] = []
-    for (const [name, raw, color] of [['Target', target, COLORS.up], ['Stop', stop, COLORS.down]] as const) {
-      const v = parseFloat(raw)
-      if (!isFinite(v)) continue
-      const o = touchOdds(win, touchNow.price, v)
-      marks.push({ price: v, label: `${name} ${v.toFixed(2)}, ${o == null ? 'under 10%' : `${Math.round(o * 100)}%`}`, color })
-    }
-    return { end: parseEt(win.end!), rungs: win.levels!.map((l) => ({ up: l.up, down: l.down, odds: l.odds })), marks }
-  }, [mode, touchNow, win, target, stop])
 
   const read = useMemo(
     () => (view ? analyze(view.bars, view.ind, view.sessStarts, prediction) : null),
@@ -245,23 +219,19 @@ export default function App() {
                   <button key={r} className={r === range ? 'on' : ''} aria-pressed={r === range} onClick={() => setRange(r)}>{r}</button>
                 ))}
               </div>
-              {(coneView || touchNow) && (
+              {coneView && (
                 <div className="seg" style={{ marginLeft: 'auto' }} role="group" aria-label="Forecast overlay">
-                  <button className={mode === 'touch' ? 'on' : ''} aria-pressed={mode === 'touch'} onClick={() => setPick('touch')} disabled={!touchNow}>Touch ladder</button>
-                  <button className={mode === 'cone' ? 'on' : ''} aria-pressed={mode === 'cone'} onClick={() => setPick('cone')} disabled={!coneView}>Range cone</button>
+                  <button className={showCone ? 'on' : ''} aria-pressed={showCone} onClick={() => setShowCone(!showCone)}>Range cone</button>
                 </div>
               )}
             </div>
-            {mode === 'touch' && touchNow && (
-              <TouchLadderStrip touch={touchNow} win={win} onWindow={setWinMin} tz={tz} target={target} stop={stop} onTarget={setTarget} onStop={setStop} />
-            )}
-            {mode === 'cone' && coneView && cone && (
+            {coneView && cone && (
               <RangeConeStrip cone={cone} scores={coneScores} tz={tz} show={showCone} onShow={setShowCone}
                 canReveal={coneView.after.length > 0} reveal={reveal} onReveal={setReveal}
                 closeAt={(t) => coneView.after.find((a) => a.t === t)?.c} />
             )}
             <PriceChart bars={bars} ind={ind} sessStarts={sessStarts} toggles={toggles} range={range} tz={tz}
-              cone={mode === 'cone' && showCone && coneView ? coneView.points : null} after={mode === 'cone' && reveal && coneView ? coneView.after : null} ladder={ladder} />
+              cone={showCone && coneView ? coneView.points : null} after={reveal && coneView ? coneView.after : null} ladder={null} />
             <p className="basis">Candles are actual KO prices. All times are {tz === 'IST' ? 'India time (IST)' : 'New York time (ET)'}. Overnight gaps are not drawn as candles.</p>
           </section>
           {apiUrl && <DayPlanPanel plan={plan} nextPlan={nextPlan} scores={scores} bars={data.bars} session={data.sessions[sIdx]} asOf={asOf} tz={tz} />}

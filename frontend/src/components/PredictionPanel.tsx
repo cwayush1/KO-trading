@@ -2,6 +2,9 @@ import type { DayPlan } from '../lib/types'
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 
+/** Confidence threshold: |p_up - 0.5| below this → Neutral */
+const NEUTRAL_BAND = 0.08
+
 function Bar({ value, color }: { value: number; color: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -46,6 +49,7 @@ export default function PredictionPanel({ plan }: Props) {
                 <tr>
                   <th>Time (ET)</th>
                   <th style={{ color: 'var(--down)' }}>↓ Down</th>
+                  <th style={{ color: '#888' }}>— Neutral</th>
                   <th style={{ color: 'var(--up)' }}>↑ Up</th>
                   <th>Call</th>
                 </tr>
@@ -54,17 +58,29 @@ export default function PredictionPanel({ plan }: Props) {
                 {slots.map(s => {
                   const p_up = s.p_up
                   const p_down = 1 - p_up
-                  const isUp = p_up >= 0.5
-                  const faint = Math.abs(p_up - 0.5) < 0.05
+                  const conf = Math.abs(p_up - 0.5)
+                  const isNeutral = conf < NEUTRAL_BAND
+                  const isUp = !isNeutral && p_up >= 0.5
+
+                  // Split neutral mass evenly from both sides so bars sum to 1
+                  const neutralMass = isNeutral ? Math.max(0, NEUTRAL_BAND * 2 - conf * 2) : 0
+                  const half = neutralMass / 2
+                  const dispDown = p_down - half
+                  const dispUp = p_up - half
+                  const dispNeutral = neutralMass
+
                   return (
-                    <tr key={s.slot} className={`sf-row sf-row-${isUp ? 'up' : 'down'} ${faint ? 'sf-row-faint' : ''}`}>
+                    <tr key={s.slot} className={`sf-row ${isNeutral ? 'sf-row-faint' : isUp ? 'sf-row-up' : 'sf-row-down'}`}>
                       <td className="sf-time-col">{s.time}</td>
-                      <td><Bar value={p_down} color="var(--down)" /></td>
-                      <td><Bar value={p_up} color="var(--up)" /></td>
+                      <td><Bar value={Math.max(0, dispDown)} color="var(--down)" /></td>
+                      <td><Bar value={Math.max(0, dispNeutral)} color="#888" /></td>
+                      <td><Bar value={Math.max(0, dispUp)} color="var(--up)" /></td>
                       <td>
-                        {isUp
-                          ? <span style={{ color: 'var(--up)', fontWeight: 700, fontSize: 13 }}>↑ UP</span>
-                          : <span style={{ color: 'var(--down)', fontWeight: 700, fontSize: 13 }}>↓ DN</span>}
+                        {isNeutral
+                          ? <span style={{ color: '#888', fontWeight: 700, fontSize: 13 }}>— N</span>
+                          : isUp
+                            ? <span style={{ color: 'var(--up)', fontWeight: 700, fontSize: 13 }}>↑ UP</span>
+                            : <span style={{ color: 'var(--down)', fontWeight: 700, fontSize: 13 }}>↓ DN</span>}
                       </td>
                     </tr>
                   )
@@ -75,7 +91,7 @@ export default function PredictionPanel({ plan }: Props) {
 
           <p className="basis" style={{ marginTop: 8 }}>
             Pre-open forecast using sessions through {plan.uses_sessions_through}.
-            Faint rows ≈ 50/50.
+            Neutral = model confidence &lt;8% from 50/50.
           </p>
         </>
       )}

@@ -44,9 +44,8 @@ def root():
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
-    f = forecaster()
-    return {"status": "ok", "model": f.bundle["model_label"], "trained_through": f.trained_through.strftime("%Y-%m-%d"),
-            "candles": len(f.frame), "last_candle": f.frame["time"].iloc[-1].strftime("%Y-%m-%dT%H:%M")}
+    """Lightweight health check — does NOT load the model so UptimeRobot never triggers an OOM."""
+    return {"status": "ok", "time": datetime.utcnow().isoformat()}
 
 
 @app.get("/api/candles", response_class=PlainTextResponse)

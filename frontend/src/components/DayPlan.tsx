@@ -99,7 +99,7 @@ export default function DayPlanPanel({ plan, nextPlan, bars, session, asOf, tz }
       )}
 
       <div className="plan-rows">
-        <span className="plan-label">Called</span>
+        <span className="plan-label">Predicted</span>
         <div className="plan-grid">
           {shown.slots.map((c) => {
             const up = c.p_up >= 0.5
@@ -116,7 +116,7 @@ export default function DayPlanPanel({ plan, nextPlan, bars, session, asOf, tz }
               title={`${at(c.time)}: ${a == null ? 'not happened yet' : a > 0 ? 'green' : a < 0 ? 'red' : 'flat'}`} />
           })}
         </div>
-        <span className="plan-label">Right</span>
+        <span className="plan-label">✓ Hit</span>
         <div className="plan-grid thin">
           {shown.slots.map((c) => {
             const a = actual[c.slot]

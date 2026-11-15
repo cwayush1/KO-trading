@@ -70,23 +70,32 @@ export default function PredictionPanel({ plan }: Props) {
                   const p_down_d = p_down - half_neutral   // display down
                   const p_up_d   = p_up   - half_neutral   // display up
 
-                  // Call label
+                  // Call label & styling
                   const isNeutralCall = conf < NEUTRAL_CALL
                   const isUp = p_up >= 0.5
-                  const faint = conf < 0.05
+                  const callType = isNeutralCall ? 'neutral' : isUp ? 'up' : 'down'
+
+                  // Faint background tint scaled by confidence
+                  const bgTint = isNeutralCall
+                    ? 'rgba(136, 148, 161, 0.05)'
+                    : isUp
+                      ? `rgba(14, 138, 95, ${(0.035 + Math.min(1, conf / 0.06) * 0.055).toFixed(3)})`
+                      : `rgba(200, 55, 45, ${(0.035 + Math.min(1, conf / 0.06) * 0.055).toFixed(3)})`
 
                   return (
-                    <tr key={s.slot} className={`sf-row ${faint ? 'sf-row-faint' : isUp ? 'sf-row-up' : 'sf-row-down'}`}>
+                    <tr
+                      key={s.slot}
+                      className={`sf-row sf-row-${callType}`}
+                      style={{ background: bgTint }}
+                    >
                       <td className="sf-time-col">{s.time}</td>
                       <td><Bar value={Math.max(0, p_down_d)} color="var(--down)" /></td>
                       <td><Bar value={Math.max(0, p_neutral)} color="#8894a1" /></td>
                       <td><Bar value={Math.max(0, p_up_d)} color="var(--up)" /></td>
                       <td>
-                        {isNeutralCall
-                          ? <span style={{ color: '#8894a1', fontWeight: 700, fontSize: 13 }}>— N</span>
-                          : isUp
-                            ? <span style={{ color: 'var(--up)', fontWeight: 700, fontSize: 13 }}>↑ UP</span>
-                            : <span style={{ color: 'var(--down)', fontWeight: 700, fontSize: 13 }}>↓ DN</span>}
+                        <span className={`sf-call-badge sf-call-${callType}`}>
+                          {isNeutralCall ? '— N' : isUp ? '↑ UP' : '↓ DN'}
+                        </span>
                       </td>
                     </tr>
                   )

@@ -98,20 +98,14 @@ export default function DayPlanPanel({ plan, nextPlan, bars, session, asOf, tz }
         </p>
       )}
 
-      {/* NEUTRAL_BAND: |p_up - 0.5| below this → grey neutral cell */}
       <div className="plan-rows">
         <span className="plan-label">Predicted</span>
         <div className="plan-grid">
           {shown.slots.map((c) => {
-            const conf = Math.abs(c.p_up - 0.5)
-            const isNeutral = conf < 0.08
-            const isUp = !isNeutral && c.p_up >= 0.5
-            const pct = Math.round(Math.max(c.p_up, 1 - c.p_up) * 100)
-            const strength = isNeutral ? 0.55 : 0.35 + Math.min(1, conf / 0.04) * 0.65
-            const cls = isNeutral ? 'b-neutral' : isUp ? 'b-up' : 'b-down'
-            const lbl = isNeutral ? 'neutral' : isUp ? 'green' : 'red'
-            return <i key={c.slot} className={cls} style={{ opacity: strength }}
-              title={`${at(c.time)}: ${lbl} ${pct}%`} />
+            const up = c.p_up >= 0.5
+            const strength = 0.35 + Math.min(1, Math.abs(c.p_up - 0.5) / 0.04) * 0.65
+            return <i key={c.slot} className={up ? 'b-up' : 'b-down'} style={{ opacity: strength }}
+              title={`${at(c.time)}: ${up ? 'green' : 'red'} ${Math.round(Math.max(c.p_up, 1 - c.p_up) * 100)}%`} />
           })}
         </div>
         <span className="plan-label">Actual</span>

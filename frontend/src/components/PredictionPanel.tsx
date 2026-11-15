@@ -2,17 +2,20 @@ import type { DayPlan } from '../lib/types'
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 
-/** Call threshold: |p_up - 0.5| below this → Neutral call label only.
- *  Bars always show full Down / Up split summing to 100%. */
+/** Neutral half-width: at exactly p_up=0.5, neutral gets 2*HALF_N = 10%.
+ *  Neutral mass → 0 linearly as the model moves ≥5% from center. */
+const HALF_N = 0.05
+
+/** Call shows "— N" only when truly near 50/50 (within 2% of center). */
 const NEUTRAL_CALL = 0.02
 
 function Bar({ value, color }: { value: number; color: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <div style={{ flex: 1, height: 7, background: 'var(--line)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ width: `${value * 100}%`, height: '100%', background: color, borderRadius: 4 }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 600, minWidth: 38, textAlign: 'right', color }}>
+      <span style={{ fontSize: 11, fontWeight: 600, minWidth: 36, textAlign: 'right', color }}>
         {pct(value)}
       </span>
     </div>
@@ -50,6 +53,7 @@ export default function PredictionPanel({ plan }: Props) {
                 <tr>
                   <th>Time (ET)</th>
                   <th style={{ color: 'var(--down)' }}>↓ Down</th>
+                  <th style={{ color: '#8894a1' }}>— Neutral</th>
                   <th style={{ color: 'var(--up)' }}>↑ Up</th>
                   <th>Call</th>
                 </tr>
@@ -59,18 +63,27 @@ export default function PredictionPanel({ plan }: Props) {
                   const p_up = s.p_up
                   const p_down = 1 - p_up
                   const conf = Math.abs(p_up - 0.5)
-                  // Neutral call only when truly near 50/50 (within 2%)
-                  const isNeutral = conf < NEUTRAL_CALL
+
+                  // Carve neutral from the centre of the down/up split
+                  const half_neutral = Math.max(0, HALF_N - conf)
+                  const p_neutral = 2 * half_neutral
+                  const p_down_d = p_down - half_neutral   // display down
+                  const p_up_d   = p_up   - half_neutral   // display up
+
+                  // Call label
+                  const isNeutralCall = conf < NEUTRAL_CALL
                   const isUp = p_up >= 0.5
                   const faint = conf < 0.05
+
                   return (
                     <tr key={s.slot} className={`sf-row ${faint ? 'sf-row-faint' : isUp ? 'sf-row-up' : 'sf-row-down'}`}>
                       <td className="sf-time-col">{s.time}</td>
-                      <td><Bar value={p_down} color="var(--down)" /></td>
-                      <td><Bar value={p_up} color="var(--up)" /></td>
+                      <td><Bar value={Math.max(0, p_down_d)} color="var(--down)" /></td>
+                      <td><Bar value={Math.max(0, p_neutral)} color="#8894a1" /></td>
+                      <td><Bar value={Math.max(0, p_up_d)} color="var(--up)" /></td>
                       <td>
-                        {isNeutral
-                          ? <span style={{ color: '#888', fontWeight: 700, fontSize: 13 }}>— N</span>
+                        {isNeutralCall
+                          ? <span style={{ color: '#8894a1', fontWeight: 700, fontSize: 13 }}>— N</span>
                           : isUp
                             ? <span style={{ color: 'var(--up)', fontWeight: 700, fontSize: 13 }}>↑ UP</span>
                             : <span style={{ color: 'var(--down)', fontWeight: 700, fontSize: 13 }}>↓ DN</span>}
@@ -84,7 +97,7 @@ export default function PredictionPanel({ plan }: Props) {
 
           <p className="basis" style={{ marginTop: 8 }}>
             Pre-open forecast using sessions through {plan.uses_sessions_through}.
-            Faint = low confidence. Neutral call = within 2% of 50/50.
+            Down + Neutral + Up = 100%. Neutral peaks at 10% when model is 50/50.
           </p>
         </>
       )}

@@ -1,5 +1,5 @@
 import type { Cone, ConeScores } from '../lib/types'
-import { clockIn, dayLabel, inZone, parseEt, type Zone } from '../lib/time'
+import { clockIn, dayLabel, parseEt, type Zone } from '../lib/time'
 
 interface Props {
   cone: Cone | null
@@ -29,7 +29,6 @@ export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReve
   const rows = cone.horizons.filter((h) => WINDOWS.includes(h.minutes))
   const r = cone.width_vs_usual
   const mood = r == null ? null : r >= 1.15 ? 'Busier than usual' : r <= 0.87 ? 'Quieter than usual' : 'About as busy as usual'
-  const first = cone.points[0] ? parseEt(cone.points[0].time) : 0
   const all = scores?.since_training, day = scores?.session
 
   return (
@@ -37,15 +36,11 @@ export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReve
       <div className="cone-head">
         <div>
           <h2>Range cone <span className="tag">Model-generated</span></h2>
-          <p className="cone-lead">
-            {opening ? (
-              <>No more room before the bell, so this covers the open on {dayLabel(inZone(first, tz), false)}, overnight gap included.</>
-            ) : (
-              <>
-                <strong className={r != null && r >= 1.15 ? 'warn' : ''}>{mood}.</strong> The model draws the next hour {r!.toFixed(2)}x as wide as a normal one.
-              </>
-            )}
-          </p>
+          {!opening && (
+            <p className="cone-lead">
+              <strong className={r != null && r >= 1.15 ? 'warn' : ''}>{mood}.</strong> The model draws the next hour {r!.toFixed(2)}x as wide as a normal one.
+            </p>
+          )}
         </div>
         <div className="chips" role="group" aria-label="Range cone display">
           <button className={show ? 'on' : ''} aria-pressed={show} onClick={() => onShow(!show)}>
@@ -57,17 +52,17 @@ export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReve
         </div>
       </div>
 
-      <dl className="cone-cells">
+      {!opening && <dl className="cone-cells">
         {rows.map((h) => {
           const end = parseEt(h.time) + 300          // the candle closes five minutes after it starts
           const got = reveal ? closeAt(parseEt(h.time)) : undefined
           const inside = got != null && got >= h.lo80 && got <= h.hi80
           return (
             <div key={h.minutes}>
-              <dt>{opening ? `${windowName(h.minutes)} after the open` : `Next ${windowName(h.minutes)}`}, by {clockIn(end, tz)} {tz}</dt>
+              <dt>Next {windowName(h.minutes)}, by {clockIn(end, tz)} {tz}</dt>
               <dd>
                 <span className="cone-range">{h.lo50.toFixed(2)} to {h.hi50.toFixed(2)}</span>
-                <span className="cone-pm">±{((h.hi50 - h.lo50) / 2).toFixed(2)}</span>
+                <span className="cone-pm">Â±{((h.hi50 - h.lo50) / 2).toFixed(2)}</span>
               </dd>
               <dd className="cone-sub">
                 {got != null
@@ -78,7 +73,7 @@ export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReve
           )
         })}
         {rows.length === 0 && <div><dt>Too close to the bell for a 30-minute range</dt><dd className="cone-sub">The chart shows the minutes that are left.</dd></div>}
-      </dl>
+      </dl>}
 
       {all && all['60'].n > 0 && (
         <div className="cone-record">

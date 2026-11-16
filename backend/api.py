@@ -196,7 +196,13 @@ def update_candles():
         info = update()
         if info.get("added", 0) > 0:
             forecaster().reload()
-        result = {"ok": True, "message": f"Updated from Alpaca, {info.get('added', 0):+d} candles", **health()}
+        result = {
+            "ok": True,
+            "message": f"Updated from Alpaca, {info.get('added', 0):+d} candles",
+            # The browser uses this to know when it needs to fetch the new CSV.
+            "last_candle": str(info["last_candle"]).replace(" ", "T")[:16],
+            **health(),
+        }
     except (UpdateError, Exception) as e:
         result = {"ok": False, "message": str(e), **health()}
     _last_update.update(at=time.time(), result=result)

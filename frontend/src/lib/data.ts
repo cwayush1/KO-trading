@@ -9,17 +9,20 @@ export interface Dataset {
   sessions: Session[]
 }
 
-/** Loads candles from the backend when it is reachable, otherwise from the bundled CSV. */
-export async function loadDataset(): Promise<Dataset> {
+/** Loads candles from the backend. Initial loads may fall back to the bundled CSV. */
+export async function loadDataset(apiOnly = false): Promise<Dataset> {
   const local = `${import.meta.env.BASE_URL}data/ko_5min.csv`
   if (API) {
     try {
-      const res = await fetch(`${API}/api/candles?symbol=KO`)
-      if (res.ok) return parseCsv(await res.text())
+      const res = await fetch(`${API}/api/candles?symbol=KO`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`Could not load live candles (${res.status})`)
+      return parseCsv(await res.text())
     } catch {
+      if (apiOnly) throw new Error('Could not load live candles from the backend.')
       // Backend not running: fall back to the bundled file so the chart still works.
     }
   }
+  if (apiOnly) throw new Error('The live candle backend is not configured.')
   const res = await fetch(local)
   if (!res.ok) throw new Error(`Could not load candles (${res.status}) from ${local}`)
   return parseCsv(await res.text())

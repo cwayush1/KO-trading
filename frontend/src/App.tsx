@@ -15,6 +15,14 @@ const RANGES: RangeKey[] = ['1D', '5D', '1M', '3M']
 const HISTORY_SESSIONS = 66
 
 const compact = (v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}K` : String(v))
+const latestBar = (d: Dataset) => {
+  const b = d.bars, i = b.t.length - 1
+  return {
+    time: `${isoDate(b.t[i])}T${hhmm(b.t[i])}`,
+    // Also notice a correction to the latest bar when its timestamp stays the same.
+    fingerprint: [b.t.length, b.t[i], b.o[i], b.h[i], b.l[i], b.c[i], b.v[i]].join(':')
+  }
+}
 
 export default function App() {
   const [data, setData] = useState<Dataset | null>(null)
@@ -34,16 +42,20 @@ export default function App() {
   const [update, setUpdate] = useState<{ ok: boolean; message: string; at: number } | null>(null)
   const [tz, setTz] = useState<Zone>(defaultZone)
   const [clock, setClock] = useState(nyNow)
-  const live = useRef({ lastCandle: '', atLatest: true })
+  const live = useRef({ lastCandle: '', fingerprint: '', atLatest: true })
 
-  // Load candles. `follow` moves the view to the newest candle (first load, or when already there).
-  const refresh = useCallback((follow: boolean) => {
-    return loadDataset()
+  // Keep following the newest candle only if the viewer has not entered replay.
+  const refresh = useCallback((follow?: boolean, apiOnly = false) => {
+    return loadDataset(apiOnly)
       .then((d) => {
+        const newest = latestBar(d)
+        if (newest.time < live.current.lastCandle || newest.fingerprint === live.current.fingerprint) return
+        const shouldFollow = follow ?? live.current.atLatest
         setData(d)
-        const t = d.bars.t[d.bars.t.length - 1]
-        live.current.lastCandle = `${isoDate(t)}T${hhmm(t)}`
-        if (follow) {
+        live.current.lastCandle = newest.time
+        live.current.fingerprint = newest.fingerprint
+        setLoadError(null)
+        if (shouldFollow) {
           setSIdx(d.sessions.length - 1)
           setAsOf(d.bars.t.length - 1)
         }
@@ -52,7 +64,10 @@ export default function App() {
           fetchPlanScores(20).then(setScores).catch(() => setScores(null))
         }
       })
-      .catch((e: Error) => setLoadError(e.message))
+      .catch((e: Error) => {
+        if (apiOnly) throw e // A temporary polling failure must not hide an already loaded chart.
+        setLoadError(e.message)
+      })
   }, [])
 
   useEffect(() => {
@@ -64,16 +79,32 @@ export default function App() {
   // Once a minute, ask the backend to pull new candles from Alpaca and pick them up.
   useEffect(() => {
     if (!apiUrl) return
-    const tick = () =>
-      requestUpdate()
-        .then((u) => {
-          setUpdate({ ok: u.ok, message: u.message, at: nyNow().t })
-          if (u.last_candle && live.current.lastCandle && u.last_candle !== live.current.lastCandle) refresh(live.current.atLatest)
-        })
-        .catch(() => setUpdate({ ok: false, message: 'the backend is not reachable.', at: nyNow().t }))
+    let inFlight = false
+    const tick = async () => {
+      if (inFlight) return
+      inFlight = true
+      try {
+        const u = await requestUpdate()
+        setUpdate({ ok: u.ok, message: u.message, at: nyNow().t })
+        // Older API deployments omit last_candle. Check the live CSV in that case too.
+        if (!u.last_candle || u.last_candle !== live.current.lastCandle) {
+          try {
+            await refresh(undefined, true)
+          } catch {
+            setUpdate({ ok: false, message: 'new candles could not be loaded.', at: nyNow().t })
+          }
+        }
+      } catch {
+        setUpdate({ ok: false, message: 'the backend is not reachable.', at: nyNow().t })
+      } finally {
+        inFlight = false
+      }
+    }
     const initialTimer = setTimeout(tick, 10_000)
     const id = setInterval(tick, 60_000)
-    return () => { clearTimeout(initialTimer); clearInterval(id) }
+    const onVisible = () => { if (!document.hidden) void tick() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearTimeout(initialTimer); clearInterval(id); document.removeEventListener('visibilitychange', onVisible) }
   }, [refresh])
 
   const goSession = (i: number) => {

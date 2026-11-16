@@ -209,7 +209,7 @@ export interface Touch {
 }
 
 /** POST /api/update: result of asking the backend to pull new candles from Alpaca. */
-export interface UpdateStatus { ok: boolean; message: string; last_candle: string }
+export interface UpdateStatus { ok: boolean; message: string; last_candle?: string }
 
 /** One candle's DOWN/NEUTRAL/UP probabilities for a fixed horizon. */
 export interface CandleForecast {

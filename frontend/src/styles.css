@@ -196,16 +196,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--model); out
 /* ── Candle Forecast Table ───────────────────────────────────────────── */
 .sf-panel { min-width: 0; }
 
-/* Ten-session day-plan accuracy beneath the candle forecast */
+/* Twenty-session day-plan accuracy beneath the candle forecast */
 .accuracy-panel { border: 1px solid var(--line); }
 .accuracy-subtitle { color: var(--muted); font-size: 12px; }
 .accuracy-chart { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
 .accuracy-gridline { stroke: var(--line); stroke-width: 1; }
 .accuracy-midline { stroke: #8793a0; stroke-width: 1; stroke-dasharray: 4 3; }
 .accuracy-axis, .accuracy-date { fill: var(--muted); font-size: 10px; }
-.accuracy-value { fill: var(--ink); font-size: 10px; font-weight: 600; }
-.accuracy-above { fill: var(--up); }
-.accuracy-below { fill: var(--down); }
+.accuracy-trend { fill: none; stroke: var(--model); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.accuracy-point { fill: var(--model); stroke: var(--surface); stroke-width: 1.5; pointer-events: none; }
+.accuracy-tooltip { pointer-events: none; }
+.accuracy-tooltip rect { fill: var(--ink); }
+.accuracy-tooltip text { fill: var(--surface); font-size: 11px; font-weight: 600; }
 .accuracy-note { color: var(--muted); font-size: 12px; margin-top: 4px; }
 .sf-table-wrap {
   max-height: 520px;

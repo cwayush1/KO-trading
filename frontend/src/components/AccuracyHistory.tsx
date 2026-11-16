@@ -1,57 +1,83 @@
+import { useState } from 'react'
 import type { PlanScores } from '../lib/types'
 
 interface Props {
   scores: PlanScores | null
 }
 
-/** The day plan's accuracy over the latest ten sessions with scored candles. */
+const MIN = 0.3
+const MAX = 0.7
+const LEFT = 32
+const TOP = 32
+const WIDTH = 312
+const HEIGHT = 120
+
+/** The day plan's accuracy over the latest twenty sessions with scored candles. */
 export default function AccuracyHistory({ scores }: Props) {
-  const days = scores?.recent.filter((day) => day.total > 0).slice(-10) ?? []
+  const [hovered, setHovered] = useState<number | null>(null)
+  const days = scores?.recent.filter((day) => day.total > 0).slice(-20) ?? []
   const lastDate = days.length ? days[days.length - 1].date : null
-  const left = 32
-  const top = 24
-  const height = 120
-  const bottom = top + height
-  const width = 312
-  const step = width / Math.max(days.length, 1)
-  const barWidth = Math.min(22, step * 0.68)
+  const step = WIDTH / Math.max(days.length - 1, 1)
+  const points = days.map((day, index) => {
+    const accuracy = day.right / day.total
+    const plotted = Math.max(MIN, Math.min(MAX, accuracy))
+    return {
+      ...day,
+      accuracy,
+      x: days.length === 1 ? LEFT + WIDTH / 2 : LEFT + index * step,
+      y: TOP + ((MAX - plotted) / (MAX - MIN)) * HEIGHT,
+    }
+  })
+  const active = hovered === null ? null : points[hovered] ?? null
 
   return (
     <section className="panel accuracy-panel" aria-labelledby="accuracy-heading">
       <header className="panel-head">
         <h2 id="accuracy-heading">Directional accuracy</h2>
       </header>
-      <p className="accuracy-subtitle">Day plan · last {days.length || 10} trading sessions{lastDate ? ` through ${lastDate}` : ''}</p>
+      <p className="accuracy-subtitle">Day plan · last {days.length || 20} trading sessions{lastDate ? ` through ${lastDate}` : ''}</p>
 
       {days.length ? (
         <>
-          <svg className="accuracy-chart" viewBox="0 0 360 180" role="img" aria-labelledby="accuracy-chart-title accuracy-chart-desc">
-            <title id="accuracy-chart-title">Day-plan accuracy by trading session</title>
-            <desc id="accuracy-chart-desc">Each bar shows the percentage of non-flat five-minute candles called correctly. The dashed line marks 50 percent.</desc>
-            {[0, 0.5, 1].map((value) => {
-              const y = bottom - value * height
+          <svg className="accuracy-chart" viewBox="0 0 360 184" role="img" aria-labelledby="accuracy-chart-title accuracy-chart-desc">
+            <title id="accuracy-chart-title">Day-plan accuracy trend</title>
+            <desc id="accuracy-chart-desc">The vertical scale runs from 30 to 70 percent. Each point is the percentage of non-flat five-minute candles called correctly on one trading day. The dashed line marks 50 percent.</desc>
+            {[0.3, 0.4, 0.5, 0.6, 0.7].map((value) => {
+              const y = TOP + ((MAX - value) / (MAX - MIN)) * HEIGHT
               return (
                 <g key={value}>
-                  <line x1={left} x2={left + width} y1={y} y2={y} className={value === 0.5 ? 'accuracy-midline' : 'accuracy-gridline'} />
-                  <text x={left - 6} y={y + 4} textAnchor="end" className="accuracy-axis">{Math.round(value * 100)}</text>
+                  <line x1={LEFT} x2={LEFT + WIDTH} y1={y} y2={y} className={value === 0.5 ? 'accuracy-midline' : 'accuracy-gridline'} />
+                  <text x={LEFT - 6} y={y + 4} textAnchor="end" className="accuracy-axis">{Math.round(value * 100)}</text>
                 </g>
               )
             })}
-            {days.map((day, index) => {
-              const accuracy = day.right / day.total
-              const x = left + index * step + (step - barWidth) / 2
-              const y = bottom - accuracy * height
-              return (
-                <g key={day.date}>
-                  <title>{`${day.date}: ${(accuracy * 100).toFixed(1)}%, ${day.right} of ${day.total} candles correct`}</title>
-                  <rect x={x} y={y} width={barWidth} height={bottom - y} rx="3" className={accuracy >= 0.5 ? 'accuracy-above' : 'accuracy-below'} />
-                  <text x={x + barWidth / 2} y={Math.max(top - 9, y - 5)} textAnchor="middle" className="accuracy-value">{Math.round(accuracy * 100)}%</text>
-                  <text x={x + barWidth / 2} y={bottom + 17} textAnchor="middle" className="accuracy-date">{day.date.slice(5)}</text>
-                </g>
-              )
-            })}
+            <polyline className="accuracy-trend" points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
+            {points.map((point, index) => (
+              <g key={point.date}>
+                <circle cx={point.x} cy={point.y} r={hovered === index ? 5 : 3} className="accuracy-point" />
+                {(index === 0 || index === points.length - 1 || (index + 1) % 5 === 0) && (
+                  <text x={point.x} y={TOP + HEIGHT + 18} textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'} className="accuracy-date">{point.date.slice(5)}</text>
+                )}
+                <rect x={point.x - step / 2} y={TOP} width={step} height={HEIGHT} fill="transparent"
+                  tabIndex={0} role="button"
+                  aria-label={`${point.date}: ${(point.accuracy * 100).toFixed(1)}% correct, ${point.right} of ${point.total} candles`}
+                  onMouseEnter={() => setHovered(index)} onMouseLeave={() => setHovered(null)}
+                  onFocus={() => setHovered(index)} onBlur={() => setHovered(null)} />
+              </g>
+            ))}
+            {active && (
+              <g className="accuracy-tooltip">
+                <rect x={Math.max(LEFT, Math.min(LEFT + WIDTH - 140, active.x - 70))} y={2} width={140} height={25} rx={5} />
+                <text x={Math.max(LEFT, Math.min(LEFT + WIDTH - 140, active.x - 70)) + 70} y={19} textAnchor="middle">
+                  {`${active.date} · ${(active.accuracy * 100).toFixed(1)}%`}
+                </text>
+              </g>
+            )}
           </svg>
-          <p className="accuracy-note">Correct calls ÷ non-flat candles. The newest session updates as candles arrive.</p>
+          <p className="accuracy-note">30–70% scale · hover for the exact date and percentage. The newest session updates as candles arrive.</p>
+          {points.some((point) => point.accuracy < MIN || point.accuracy > MAX) && (
+            <p className="accuracy-note">Values outside this range sit at the chart edge.</p>
+          )}
         </>
       ) : (
         <p className="accuracy-note">Accuracy history will appear when the model scores are available.</p>

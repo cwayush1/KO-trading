@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { apiUrl, fetchCone, fetchDayPlan, fetchPlanScores, fetchPrediction, loadDataset, requestUpdate, sliceBars, type Dataset } from './lib/data'
+import { apiUrl, fetchCone, fetchConeScores, fetchDayPlan, fetchPlanScores, fetchPrediction, loadDataset, requestUpdate, sliceBars, type Dataset } from './lib/data'
 import { computeIndicators } from './lib/indicators'
 import { analyze } from './lib/analysis'
 import { clockIn, dayLabel, defaultZone, hhmm, inZone, isoDate, nyNow, parseEt, saveZone, type Zone } from './lib/time'
-import type { Cone, DayPlan, PlanScores, Prediction, RangeKey, Toggles } from './lib/types'
+import type { Cone, ConeScores, DayPlan, PlanScores, Prediction, RangeKey, Toggles } from './lib/types'
 import PriceChart from './components/PriceChart'
 import SessionBar from './components/SessionBar'
 import DayPlanPanel from './components/DayPlan'
+import RangeConeStrip from './components/RangeCone'
 import PredictionPanel from './components/PredictionPanel'
 
 const RANGES: RangeKey[] = ['1D', '5D', '1M', '3M']
@@ -23,7 +24,9 @@ export default function App() {
   const [toggles] = useState<Toggles>({ ema: false, vwap: false, bb: false, levels: false, rsi: false, macd: false })
   const [prediction, setPrediction] = useState<Prediction | null>(null)
   const [cone, setCone] = useState<Cone | null>(null)
+  const [coneScores, setConeScores] = useState<ConeScores | null>(null)
   const [showCone, setShowCone] = useState(true)
+  const [reveal, setReveal] = useState(false)
   const [plan, setPlan] = useState<DayPlan | null>(null)
   const [nextPlan, setNextPlan] = useState<DayPlan | null>(null)
   const [scores, setScores] = useState<PlanScores | null>(null)
@@ -57,7 +60,7 @@ export default function App() {
     return () => clearInterval(id)
   }, [refresh])
 
-  // Once a minute, ask the backend to pull new candles from Alpaca (delayed on mount to prevent 502 concurrency spikes).
+  // Once a minute, ask the backend to pull new candles from Alpaca and pick them up.
   useEffect(() => {
     if (!apiUrl) return
     const tick = () =>
@@ -101,6 +104,9 @@ export default function App() {
       fetchCone(`${isoDate(asOfT)}T${hhmm(asOfT)}`, ctl.signal)
         .then(setCone)
         .catch((e: Error) => { if (e.name !== 'AbortError') setCone(null) })
+      fetchConeScores(`${isoDate(asOfT)}T${hhmm(asOfT)}`, ctl.signal)
+        .then(setConeScores)
+        .catch((e: Error) => { if (e.name !== 'AbortError') setConeScores(null) })
     }, 250)
     return () => { clearTimeout(id); ctl.abort() }
   }, [asOfT])
@@ -219,8 +225,13 @@ export default function App() {
                 </div>
               )}
             </div>
+            {coneView && cone && (
+              <RangeConeStrip cone={cone} scores={coneScores} tz={tz} show={showCone} onShow={setShowCone}
+                canReveal={coneView.after.length > 0} reveal={reveal} onReveal={setReveal}
+                closeAt={(t) => coneView.after.find((a) => a.t === t)?.c} />
+            )}
             <PriceChart bars={bars} ind={ind} sessStarts={sessStarts} toggles={toggles} range={range} tz={tz}
-              cone={showCone && coneView ? coneView.points : null} after={null} ladder={null} />
+              cone={showCone && coneView ? coneView.points : null} after={reveal && coneView ? coneView.after : null} ladder={null} />
             <p className="basis">Candles are actual KO prices. All times are {tz === 'IST' ? 'India time (IST)' : 'New York time (ET)'}. Overnight gaps are not drawn as candles.</p>
           </section>
           {apiUrl && <DayPlanPanel plan={plan} nextPlan={nextPlan} scores={scores} bars={data.bars} session={data.sessions[sIdx]} asOf={asOf} tz={tz} />}

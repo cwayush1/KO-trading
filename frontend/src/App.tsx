@@ -120,9 +120,10 @@ export default function App() {
     return () => ctl.abort()
   }, [sessionDate])
 
-  // The cone as chart points, and (only when asked for, in replay) the candles that came after.
+  // Show the range cone only for the current session. The next-session opening
+  // cone is intentionally omitted from the chart and its forecast panel.
   const coneView = useMemo(() => {
-    if (!data || !cone || cone.asof !== `${isoDate(asOfT)}T${hhmm(asOfT)}`) return null
+    if (!data || !cone || cone.kind !== 'session' || cone.asof !== `${isoDate(asOfT)}T${hhmm(asOfT)}`) return null
     const points = cone.points.map((p) => ({ t: parseEt(p.time), lo80: p.lo80, lo50: p.lo50, hi50: p.hi50, hi80: p.hi80 }))
     const last = points.length ? points[points.length - 1].t : 0
     const after: { t: number; c: number }[] = []

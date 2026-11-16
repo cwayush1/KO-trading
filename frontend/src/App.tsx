@@ -178,9 +178,6 @@ export default function App() {
           <div><dt>Day range</dt><dd>{lo.toFixed(2)} to {hi.toFixed(2)}</dd></div>
           <div><dt>Volume today</dt><dd>{compact(ind.cumVol[i])}</dd></div>
           <div><dt>Latest candle</dt><dd>{dayLabel(inZone(asOfT, tz), false)}, {clockIn(asOfT, tz)} {tz}</dd></div>
-          {scores && scores.since_training.total > 0 && (
-            <div><dt>Model accuracy</dt><dd>{((scores.since_training.right / scores.since_training.total) * 100).toFixed(1)}% over {scores.since_training.days} days</dd></div>
-          )}
         </dl>
 
         {/* Right controls */}

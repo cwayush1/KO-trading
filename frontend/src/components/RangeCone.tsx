@@ -1,5 +1,5 @@
 import type { Cone, ConeScores } from '../lib/types'
-import { clockIn, dayLabel, inZone, parseEt, type Zone } from '../lib/time'
+import { clockIn, dayLabel, parseEt, type Zone } from '../lib/time'
 
 interface Props {
   cone: Cone | null
@@ -7,12 +7,6 @@ interface Props {
   tz: Zone
   show: boolean
   onShow: (v: boolean) => void
-  /** Offered only when replaying a past moment, where later candles exist. */
-  canReveal: boolean
-  reveal: boolean
-  onReveal: (v: boolean) => void
-  /** Close of the candle that starts at this ET time, once revealed. */
-  closeAt: (t: number) => number | undefined
 }
 
 const WINDOWS = [30, 60, 120]
@@ -23,14 +17,10 @@ const dayName = (iso: string) => dayLabel(parseEt(`${iso} 00:00`), false)
 
 /** Reads the cone out in words and numbers above the chart: the likely price
  *  range for the next 30 minutes, 1 hour and 2 hours, and how wide that is against normal. */
-export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReveal, reveal, onReveal, closeAt }: Props) {
+export default function RangeConeStrip({ cone, scores, tz, show, onShow }: Props) {
   if (!cone) return null
   const opening = cone.kind === 'opening'
   const rows = cone.horizons.filter((h) => WINDOWS.includes(h.minutes))
-  const r = cone.width_vs_usual
-  const mood = r == null ? null : r >= 1.15 ? 'Busier than usual' : r <= 0.87 ? 'Quieter than usual' : 'About as busy as usual'
-  const first = cone.points[0] ? parseEt(cone.points[0].time) : 0
-  const t = cone.tested
   const all = scores?.since_training, day = scores?.session
 
   return (
@@ -38,31 +28,17 @@ export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReve
       <div className="cone-head">
         <div>
           <h2>Range cone <span className="tag">Model-generated</span></h2>
-          <p className="cone-lead">
-            {opening ? (
-              <>No more room before the bell, so this covers the open on {dayLabel(inZone(first, tz), false)}, overnight gap included.</>
-            ) : (
-              <>
-                <strong className={r != null && r >= 1.15 ? 'warn' : ''}>{mood}.</strong> The model draws the next hour {r!.toFixed(2)}x as wide as a normal one.
-              </>
-            )}
-          </p>
         </div>
         <div className="chips" role="group" aria-label="Range cone display">
           <button className={show ? 'on' : ''} aria-pressed={show} onClick={() => onShow(!show)}>
             <span className="sw"><i style={{ background: 'var(--model)' }} /></span>Cone on chart
           </button>
-          {canReveal && (
-            <button className={reveal ? 'on' : ''} aria-pressed={reveal} onClick={() => onReveal(!reveal)}>What happened next</button>
-          )}
         </div>
       </div>
 
       <dl className="cone-cells">
         {rows.map((h) => {
           const end = parseEt(h.time) + 300          // the candle closes five minutes after it starts
-          const got = reveal ? closeAt(parseEt(h.time)) : undefined
-          const inside = got != null && got >= h.lo80 && got <= h.hi80
           return (
             <div key={h.minutes}>
               <dt>{opening ? `${windowName(h.minutes)} after the open` : `Next ${windowName(h.minutes)}`}, by {clockIn(end, tz)} {tz}</dt>
@@ -71,9 +47,7 @@ export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReve
                 <span className="cone-pm">±{((h.hi50 - h.lo50) / 2).toFixed(2)}</span>
               </dd>
               <dd className="cone-sub">
-                {got != null
-                  ? <span className={inside ? 'up' : 'down'}>Closed {got.toFixed(2)}, {got >= h.lo50 && got <= h.hi50 ? 'inside the core' : inside ? 'inside the wide band' : 'outside both'}</span>
-                  : <>Wide band {h.lo80.toFixed(2)} to {h.hi80.toFixed(2)}</>}
+                Wide band {h.lo80.toFixed(2)} to {h.hi80.toFixed(2)}
               </dd>
             </div>
           )
@@ -115,19 +89,6 @@ export default function RangeConeStrip({ cone, scores, tz, show, onShow, canReve
           )}
         </div>
       )}
-
-      <p className="cone-trust">
-        <strong>How to use it.</strong> The big figures are the dark core, built to hold 1 close in 2. The wide band should hold 4 in 5. Treat the edges as realistic targets and stop distance for this window;
-        a close beyond them is an unusually large move. It says how far, not which way.
-        {t && !opening && (
-          <> Tested on {t.wf_days} unseen sessions the wide band held {pct(t.horizons['60'].wf80)} of 1-hour closes, and {pct(t.horizons['60'].test80)} on the final {t.test_days}.
-            A fixed-width band held {pct(t.fixed_narrow_cover)} in quiet markets and only {pct(t.fixed_wide_cover)} in busy ones.</>
-        )}
-        {t && opening && (
-          <> Sized from 20 days of daily moves, a rougher method: it held {pct(t.opening80.wf)} of closes one hour after the open in testing and {pct(t.opening80.test)} on the final {t.test_days} sessions.</>
-        )}
-        {cone.in_sample && <> This moment is inside the training period, so the fit here flatters the model.</>}
-      </p>
     </div>
   )
 }

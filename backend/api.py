@@ -5,6 +5,7 @@ Analysis only: there are no order, account or portfolio endpoints.
 """
 from __future__ import annotations
 
+import threading
 import time
 from datetime import datetime
 
@@ -25,16 +26,31 @@ app.add_middleware(
 )
 
 _forecaster: Forecaster | None = None
+_forecaster_lock = threading.Lock()
 
 
 def forecaster() -> Forecaster:
-    """Models are loaded from disk once. Nothing is retrained at start-up."""
+    """Thread-safe singleton. Models are loaded from disk once; concurrent requests queue cleanly."""
     global _forecaster
     if _forecaster is None:
-        if not (ARTIFACTS / "forecaster.joblib").exists():
-            raise HTTPException(503, "No trained model found. Run: python train_final.py")
-        _forecaster = Forecaster()
+        with _forecaster_lock:
+            if _forecaster is None:
+                if not (ARTIFACTS / "forecaster.joblib").exists():
+                    raise HTTPException(503, "No trained model found. Run: python train_final.py")
+                _forecaster = Forecaster()
     return _forecaster
+
+
+@app.on_event("startup")
+def preload_forecaster():
+    """Warm up models in background at startup so first user request never hits a 30s cold-start."""
+    def _warm():
+        try:
+            forecaster()
+            print("Forecaster pre-warmed successfully.")
+        except Exception as e:
+            print(f"Forecaster pre-warm note: {e}")
+    threading.Thread(target=_warm, daemon=True).start()
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
@@ -172,13 +188,16 @@ _last_update = {"at": 0.0, "result": None}
 def update_candles():
     """Pull new candles from Alpaca (at most once a minute), then recompute features."""
     from update_data import UpdateError, update
-    if time.time() - _last_update["at"] < 55 and _last_update["result"]:
+    now = time.time()
+    if now - _last_update["at"] < 55 and _last_update["result"]:
         return _last_update["result"]
+    _last_update["at"] = now
     try:
         info = update()
-        forecaster().reload()
-        result = {"ok": True, "message": f"Updated from Alpaca, {info['added']:+d} candles", **health()}
-    except UpdateError as e:
+        if info.get("added", 0) > 0:
+            forecaster().reload()
+        result = {"ok": True, "message": f"Updated from Alpaca, {info.get('added', 0):+d} candles", **health()}
+    except (UpdateError, Exception) as e:
         result = {"ok": False, "message": str(e), **health()}
     _last_update.update(at=time.time(), result=result)
     return result

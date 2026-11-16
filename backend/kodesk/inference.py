@@ -31,12 +31,12 @@ class Forecaster:
     def reload(self) -> None:
         """Recompute features from the candle file (call again after new candles arrive)."""
         candles = load_candles(self.data_path)
-        # Keep only the last 200 trading sessions (~10 months) for serving live inferences.
-        # This reduces RAM usage on cloud containers by ~75% (from 320MB down to ~80MB)
-        # while keeping more than enough history (20-60 sessions needed for indicators).
+        # Keep the last 100 trading sessions (~5 months) for serving live inferences.
+        # This keeps RAM well under 100MB on Render free tier (512MB limit)
+        # while providing plenty of history (max indicator needs 20-60 sessions).
         unique_sessions = candles["session"].unique()
-        if len(unique_sessions) > 200:
-            recent_sessions = unique_sessions[-200:]
+        if len(unique_sessions) > 100:
+            recent_sessions = unique_sessions[-100:]
             candles = candles[candles["session"].isin(recent_sessions)].reset_index(drop=True)
             candles["session"] = pd.factorize(candles["session"])[0]
 

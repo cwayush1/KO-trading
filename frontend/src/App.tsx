@@ -9,6 +9,7 @@ import SessionBar from './components/SessionBar'
 import DayPlanPanel from './components/DayPlan'
 import RangeConeStrip from './components/RangeCone'
 import PredictionPanel from './components/PredictionPanel'
+import AccuracyHistory from './components/AccuracyHistory'
 
 const RANGES: RangeKey[] = ['1D', '5D', '1M', '3M']
 const HISTORY_SESSIONS = 66
@@ -238,6 +239,7 @@ export default function App() {
         </div>
         <aside className="col-side">
           <PredictionPanel plan={plan} />
+          <AccuracyHistory scores={scores} />
         </aside>
       </main>
 
